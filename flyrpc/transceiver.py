@@ -1,12 +1,7 @@
 import socket, json, sys
 
 from queue import Queue, Empty
-from threading import Thread
-
-def start_daemon_thread(target):
-    t = Thread(target=target)
-    t.daemon = True
-    t.start()
+from flyrpc.util import start_daemon_thread
 
 class MyTransceiver:
     def __init__(self, input_binary=False, output_binary=True, line_ending='\n'):
@@ -109,7 +104,7 @@ class MyTransceiver:
 
 
 class MySocketClient(MyTransceiver):
-    def __init__(self, host='', port=0):
+    def __init__(self, host='127.0.0.1', port=0):
         super().__init__()
 
         conn = socket.create_connection((host, port))
@@ -121,7 +116,7 @@ class MySocketClient(MyTransceiver):
 
 
 class MySocketServer(MyTransceiver):
-    def __init__(self, host='', port=0, auto_stop=True):
+    def __init__(self, host='127.0.0.1', port=0, auto_stop=True):
         super().__init__()
 
         # save settings
@@ -150,11 +145,18 @@ class MySocketServer(MyTransceiver):
                 infile = conn.makefile('r')
                 self.outfile = conn.makefile('wb')
 
-                for line in infile:
-                    self.parse_line(line)
+                try:
+                    for line in infile:
+                        self.parse_line(line)
+                except ConnectionResetError:
+                    # for Windows error handling
+                    pass
 
-                print('Dropped connection.')
-                sys.stdout.flush()
+                try:
+                    print('Dropped connection.')
+                    sys.stdout.flush()
+                except OSError:
+                    pass
 
                 if self.auto_stop:
                     self.should_run = False
