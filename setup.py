@@ -9,7 +9,6 @@ setup(
     author_email='sherbst@stanford.edu',
     packages=['flyrpc'],
     install_requires=[
-        'json-rpc'
     ],
     include_package_data=True,
     zip_safe=False,
