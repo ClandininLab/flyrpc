@@ -1,5 +1,6 @@
-import sys, subprocess, os.path, re
+import sys, subprocess, os.path, json
 
+from json.decoder import JSONDecodeError
 from flyrpc.transceiver import MySocketClient
 
 def fullpath(file):
@@ -9,22 +10,28 @@ def launch_server(module, *args, **kwargs):
     python = fullpath(sys.executable)
     path = fullpath(module.__file__)
 
-    arg_list = []
-    arg_list += [str(arg) for arg in args]
-    arg_list += ['--{} {}'.format(str(k), str(v)) for k,v in kwargs.items()]
+    proc = subprocess.Popen(args=[python, path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-    proc = subprocess.Popen(args=[python, path]+arg_list, stdout=subprocess.PIPE)
+    # write options to process
+    options = {'args': args, 'kwargs': kwargs}
+    options = json.dumps(options) + '\n'
+    options = options.encode('utf-8')
+    proc.stdin.write(options)
 
-    # set up pattern matching for port
-    pattern = re.compile('ServerAddress: \(([\.\da-zA-Z]+), (\d+)\)')
-
+    # read port from server
     while True:
         line = proc.stdout.readline()
         line = line.decode('utf-8')
-        line = line.strip()
 
-        match = pattern.match(line)
-        if match is not None:
-            port = int(match.groups(0)[1])
-            print('found port: {}'.format(port))
-            return MySocketClient(port=port)
+        try:
+            data = json.loads(line)
+        except JSONDecodeError:
+            continue
+
+        try:
+            port = data['port']
+        except KeyError:
+            continue
+
+        print('Found port: {}'.format(port))
+        return MySocketClient(port=port)

@@ -1,26 +1,17 @@
 import socket, json, sys
 
 from queue import Queue, Empty
+from threading import Event
+from json.decoder import JSONDecodeError
 from flyrpc.util import start_daemon_thread
 
 class MyTransceiver:
-    def __init__(self, input_binary=False, output_binary=True, line_ending='\n'):
-        # save settings
-        self.input_binary = input_binary
-        self.output_binary = output_binary
-        self.line_ending = line_ending
-
+    def __init__(self):
         # initialize variables
         self.functions = {}
-        self.queue = Queue()
-        self.infile = None
         self.outfile = None
-
-        # special shutdown function
-        self.should_run = True
-        def shutdown():
-            self.should_run = False
-        self.register_function(shutdown)
+        self.queue = Queue()
+        self.shutdown = Event()
 
     def handle_request_list(self, request_list):
         if not isinstance(request_list, list):
@@ -48,11 +39,6 @@ class MyTransceiver:
 
             self.handle_request_list(request_list)
 
-    def serve_forever(self):
-        while self.should_run:
-            request_list = self.queue.get()
-            self.handle_request_list(request_list)
-
     def register_function(self, function, name=None):
         if name is None:
             name = function.__name__
@@ -68,21 +54,11 @@ class MyTransceiver:
         return f
 
     def parse_line(self, line):
-        if self.input_binary:
-            line = line.decode('utf-8')
-
-        line = line.strip()
-
-        if line:
-            data = json.loads(line)
-            self.queue.put(data)
+        return json.loads(line)
 
     def write_request_list(self, request_list):
-        line = json.dumps(request_list)
-        line += self.line_ending
-
-        if self.output_binary:
-            line = line.encode('utf-8')
+        line = json.dumps(request_list) + '\n'
+        line = line.encode('utf-8')
 
         try:
             self.outfile.write(line)
@@ -94,14 +70,6 @@ class MyTransceiver:
             # will happen if the other side disconnected
             pass
 
-    def start_read_thread(self):
-        def target():
-            while True:
-                line = self.infile.readline()
-                self.parse_line(line)
-
-        start_daemon_thread(target)
-
 
 class MySocketClient(MyTransceiver):
     def __init__(self, host='127.0.0.1', port=0):
@@ -112,14 +80,26 @@ class MySocketClient(MyTransceiver):
         self.infile = conn.makefile('r')
         self.outfile = conn.makefile('wb')
 
-        self.start_read_thread()
+        start_daemon_thread(self.loop)
+
+    def loop(self):
+        while True:
+            line = self.infile.readline()
+
+            try:
+                request_list = self.parse_line(line)
+            except JSONDecodeError:
+                continue
+
+            self.queue.put(request_list)
 
 
 class MySocketServer(MyTransceiver):
-    def __init__(self, host='127.0.0.1', port=0, auto_stop=True):
+    def __init__(self, host='127.0.0.1', port=0, threaded=True, auto_stop=False):
         super().__init__()
 
         # save settings
+        self.threaded = threaded
         self.auto_stop = auto_stop
 
         # create the listener
@@ -129,36 +109,44 @@ class MySocketServer(MyTransceiver):
 
         # print out socket information
         sockname = self.listener.getsockname()
-        print('ServerAddress: ({}, {})'.format(sockname[0], sockname[1]))
+        options = {'host': sockname[0], 'port': sockname[1]}
+        options = json.dumps(options) + '\n'
+        print(options)
         sys.stdout.flush()
 
         # launch the read thread
-        self.start_read_thread()
+        if self.threaded:
+            start_daemon_thread(self.loop)
 
-    def start_read_thread(self):
-        def target():
-            while True:
-                conn, address = self.listener.accept()
-                print('Accepted connection.')
+    def loop(self):
+        while not self.shutdown.is_set():
+            conn, address = self.listener.accept()
+            print('Accepted connection.')
+            sys.stdout.flush()
+
+            infile = conn.makefile('r')
+            self.outfile = conn.makefile('wb')
+
+            try:
+                for line in infile:
+                    try:
+                        request_list = self.parse_line(line)
+                    except JSONDecodeError:
+                        continue
+
+                    if self.threaded:
+                        self.queue.put(request_list)
+                    else:
+                        self.handle_request_list(request_list)
+            except ConnectionResetError:
+                # for Windows error handling
+                pass
+
+            try:
+                print('Dropped connection.')
                 sys.stdout.flush()
+            except OSError:
+                pass
 
-                infile = conn.makefile('r')
-                self.outfile = conn.makefile('wb')
-
-                try:
-                    for line in infile:
-                        self.parse_line(line)
-                except ConnectionResetError:
-                    # for Windows error handling
-                    pass
-
-                try:
-                    print('Dropped connection.')
-                    sys.stdout.flush()
-                except OSError:
-                    pass
-
-                if self.auto_stop:
-                    self.should_run = False
-
-        start_daemon_thread(target)
+            if self.auto_stop:
+                self.shutdown.set()
