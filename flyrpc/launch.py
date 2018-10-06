@@ -1,4 +1,4 @@
-import sys, subprocess, os.path, json
+import sys, subprocess, os.path, json, atexit
 
 from time import sleep, time
 
@@ -30,7 +30,10 @@ def launch_server(module, new_env_vars=None, server_poll_timeout=10, server_poll
     env.update(new_env_vars)
 
     # launch process
-    subprocess.Popen(args=cmd, env=env)
+    proc = subprocess.Popen(args=cmd, env=env)
+
+    # wait for this process to terminate upon exit
+    atexit.register(proc.wait)
 
     # try to establish connecting to client
     server_poll_start = time()

@@ -1,4 +1,4 @@
-import socket, json
+import socket, json, atexit
 
 from queue import Queue, Empty
 from threading import Event
@@ -93,9 +93,16 @@ class MySocketClient(MyTransceiver):
 
         assert port is not None, 'The port must be specified when creating a client.'
 
-        self.conn = socket.create_connection((host, port))
-        self.infile = self.conn.makefile('r')
-        self.outfile = self.conn.makefile('wb')
+        conn = socket.create_connection((host, port))
+
+        # make sure that connection is closed on
+        def cleanup():
+            conn.shutdown(socket.SHUT_RDWR)
+            conn.close()
+        atexit.register(cleanup)
+
+        self.infile = conn.makefile('r')
+        self.outfile = conn.makefile('wb')
 
         start_daemon_thread(self.loop)
 
