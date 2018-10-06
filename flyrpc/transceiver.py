@@ -93,21 +93,23 @@ class MySocketClient(MyTransceiver):
 
         assert port is not None, 'The port must be specified when creating a client.'
 
-        conn = socket.create_connection((host, port))
-
-        self.infile = conn.makefile('r')
-        self.outfile = conn.makefile('wb')
+        self.conn = socket.create_connection((host, port))
+        self.infile = self.conn.makefile('r')
+        self.outfile = self.conn.makefile('wb')
 
         start_daemon_thread(self.loop)
 
     def loop(self):
-        for line in self.infile:
-            try:
-                request_list = self.parse_line(line)
-            except JSONDecodeError:
-                continue
+        try:
+            for line in self.infile:
+                try:
+                    request_list = self.parse_line(line)
+                except JSONDecodeError:
+                    continue
 
-            self.queue.put(request_list)
+                self.queue.put(request_list)
+        except (OSError, ConnectionResetError):
+            pass
 
 
 class MySocketServer(MyTransceiver):
@@ -158,16 +160,19 @@ class MySocketServer(MyTransceiver):
             infile = conn.makefile('r')
             self.outfile = conn.makefile('wb')
 
-            for line in infile:
-                try:
-                    request_list = self.parse_line(line)
-                except JSONDecodeError:
-                    continue
+            try:
+                for line in infile:
+                    try:
+                        request_list = self.parse_line(line)
+                    except JSONDecodeError:
+                        continue
 
-                if self.threaded:
-                    self.queue.put(request_list)
-                else:
-                    self.handle_request_list(request_list)
+                    if self.threaded:
+                        self.queue.put(request_list)
+                    else:
+                        self.handle_request_list(request_list)
+            except (OSError, ConnectionResetError):
+                pass
 
             print('{} dropped connection.'.format(self.name))
 
