@@ -97,8 +97,12 @@ class MySocketClient(MyTransceiver):
 
         # make sure that connection is closed on
         def cleanup():
-            conn.shutdown(socket.SHUT_RDWR)
-            conn.close()
+            try:
+                conn.shutdown(socket.SHUT_RDWR)
+                conn.close()
+            except (OSError, ConnectionResetError):
+                pass
+
         atexit.register(cleanup)
 
         self.infile = conn.makefile('r')
