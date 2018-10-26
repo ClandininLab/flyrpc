@@ -124,7 +124,7 @@ class MySocketClient(MyTransceiver):
 
 
 class MySocketServer(MyTransceiver):
-    def __init__(self, host=None, port=None, threaded=None, auto_stop=None, name=None):
+    def __init__(self, host=None, port=None, threaded=None, auto_stop=None, accept_timeout=None, name=None):
         super().__init__()
 
         # set defaults
@@ -140,6 +140,10 @@ class MySocketServer(MyTransceiver):
         if auto_stop is None:
             auto_stop = True
 
+        if accept_timeout is None:
+            if auto_stop:
+                accept_timeout = 10
+
         if name is None:
             name = self.__class__.__name__
 
@@ -152,6 +156,7 @@ class MySocketServer(MyTransceiver):
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.bind((host, port))
         self.listener.listen()
+        self.listener.settimeout(accept_timeout)
 
         # print out socket information
         sockname = self.listener.getsockname()
@@ -164,7 +169,12 @@ class MySocketServer(MyTransceiver):
 
     def loop(self):
         while not self.shutdown_flag.is_set():
-            conn, address = self.listener.accept()
+            # wait for connection
+            try:
+                conn, address = self.listener.accept()
+            except socket.timeout:
+                print('Server received no connection within timeout, shutting down...')
+                break
 
             print('{} accepted connection.'.format(self.name))
 
