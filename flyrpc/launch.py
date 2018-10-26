@@ -1,6 +1,7 @@
 import sys, subprocess, os.path, json, atexit
 
 from time import sleep, time
+from types import ModuleType
 
 from flyrpc.transceiver import MySocketClient
 from flyrpc.util import find_free_port
@@ -8,9 +9,22 @@ from flyrpc.util import find_free_port
 def fullpath(file):
     return os.path.realpath(os.path.expanduser(file))
 
-def launch_server(module, new_env_vars=None, server_poll_timeout=10, server_poll_interval=0.1, **kwargs):
-    # add python interpreter and file name to commande
-    cmd = [fullpath(sys.executable), fullpath(module.__file__)]
+def launch_server(module_or_filename, new_env_vars=None, server_poll_timeout=10, server_poll_interval=0.1, **kwargs):
+    # create list to hold command
+    cmd = []
+
+    # add python interpreter
+    cmd += [fullpath(sys.executable)]
+
+    # add path to server file
+    if isinstance(module_or_filename, str):
+        filename = module_or_filename
+    elif isinstance(module_or_filename, ModuleType):
+        filename = module_or_filename.__file__
+    else:
+        raise ValueError('Unknown type: {}'.format(type(module_or_filename)))
+
+    cmd += [fullpath(filename)]
 
     # define host if necessary
     if 'host' not in kwargs:
