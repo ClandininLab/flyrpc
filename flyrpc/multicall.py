@@ -12,3 +12,6 @@ class MyMultiCall:
 
     def __call__(self):
         self.transceiver.write_request_list(self.request_list)
+
+    def __str__(self):
+        return str(self.request_list)
