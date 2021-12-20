@@ -7,6 +7,14 @@ from flyrpc.transceiver import MySocketClient
 from flyrpc.util import find_free_port
 
 def fullpath(file):
+    """
+    NOTE: if you are getting here because of an import error 
+    you may be using a virtual environment with symlinks.
+
+    make a new env with 
+
+    `python3 -m venv --copies <name_of_ur_venv>`
+    """
     return os.path.realpath(os.path.expanduser(file))
 
 def launch_server(module_or_filename, new_env_vars=None, server_poll_timeout=10, server_poll_interval=0.1, **kwargs):
