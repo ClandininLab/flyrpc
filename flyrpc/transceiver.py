@@ -176,7 +176,7 @@ class MySocketServer(MyTransceiver):
                 print('Server received no connection within timeout, shutting down...')
                 break
 
-            print('{} accepted connection.'.format(self.name))
+            print(f'{self.name} accepted connection from {address}.')
 
             infile = conn.makefile('r')
             self.outfile = conn.makefile('wb')
@@ -195,7 +195,7 @@ class MySocketServer(MyTransceiver):
             except (OSError, ConnectionResetError):
                 pass
 
-            print('{} dropped connection.'.format(self.name))
+            print(f'{self.name} dropped connection from {address}.')
 
             if self.auto_stop:
                 self.shutdown_flag.set()
