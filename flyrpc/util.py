@@ -16,7 +16,9 @@ def find_free_port(host=''):
     # ref: https://stackoverflow.com/a/36331860
     s = socket()
     s.bind((host, 0))
-    return s.getsockname()[1]
+    name = s.getsockname()[1]
+    s.close()
+    return name
 
 def get_kwargs():
     try:
