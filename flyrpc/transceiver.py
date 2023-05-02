@@ -25,17 +25,23 @@ class MyTransceiver:
 
     def handle_request_list(self, request_list):
         if not isinstance(request_list, list):
+            print("Warning: request_list is not a list.")
             return
 
         for request in request_list:
-            if isinstance(request, dict) and ('name' in request) and (request['name'] in self.functions):
-                # get function call parameters
-                function = self.functions[request['name']]
-                args = request.get('args', [])
-                kwargs = request.get('kwargs', {})
+            if isinstance(request, dict) and ('name' in request):
+                if request['name'] in self.functions:
+                    # get function call parameters
+                    function = self.functions[request['name']]
+                    args = request.get('args', [])
+                    kwargs = request.get('kwargs', {})
 
-                # call function
-                function(*args, **kwargs)
+                    # call function
+                    function(*args, **kwargs)
+                else:
+                    print(f"Warning: function '{request['name']}' not defined.")
+            else:
+                print(f"Warning: request '{request}' is not a valid request.")
 
     def process_queue(self):
         while True:
