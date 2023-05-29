@@ -4,7 +4,7 @@ from queue import Queue, Empty
 from threading import Event
 from json.decoder import JSONDecodeError
 
-from flyrpc.util import start_daemon_thread, stream_is_binary
+from flyrpc.util import start_daemon_thread, stream_is_binary, JSONCoderWithTuple
 
 class MyTransceiver:
     def __init__(self):
@@ -70,13 +70,13 @@ class MyTransceiver:
         if isinstance(line, bytes):
             line = line.decode('utf-8')
 
-        return json.loads(line)
+        return JSONCoderWithTuple.decode(line)
 
     def write_request_list(self, request_list):
         if self.outfile is None:
             return
 
-        line = json.dumps(request_list) + '\n'
+        line = JSONCoderWithTuple.encode(request_list) + '\n'
 
         if stream_is_binary(self.outfile):
             line = line.encode('utf-8')
