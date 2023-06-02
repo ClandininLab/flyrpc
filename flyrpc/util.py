@@ -28,6 +28,17 @@ def get_kwargs():
 
     return defaultdict(lambda: None, kwargs)
 
+def get_from_dict(dictionary, keys, default=None, remove=False):
+    if isinstance(keys, str):
+        keys = [keys]
+    return_list = []
+    for k in keys:
+        if k in dictionary:
+            return_list.append(dictionary.pop(k) if remove else dictionary[k])
+        else:
+            return_list.append(default)
+    return return_list[0] if len(return_list) == 1 else return_list
+
 class JSONCoderWithTuple():
     def encode(obj):
         def hint_tuples(item):
